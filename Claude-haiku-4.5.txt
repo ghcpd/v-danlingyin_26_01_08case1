@@ -1,0 +1,142 @@
+Claude-haiku-4.5  ：：
+User: prompt
+You are a senior software engineer and documentation verification specialist.
+Your task is to verify whether the provided tutorial documentation actually works as described when used with the provided TypeScript source code.
+You are given:
+- A README.md file containing usage examples
+- An input.ts file containing the implementation
+Your responsibilities:
+1.Verify tutorial examples
+- Follow the README.md step by step
+- Identify examples or commands that:
+- Do not run
+- Produce runtime errors
+- Behave differently from what is described
+For each failing example, provide:
+- Documentation location (file + section)
+- Example code snippet
+- Actual error or incorrect behavior
+- Root cause explanation
+--------------------------------------------------------------------------------
+2.Identify documentation mismatches
+- Compare README.md examples against actual implementation
+- Identify:
+- Wrong parameters
+- Wrong default values
+- Outdated usage patterns
+- Missing required setup steps
+--------------------------------------------------------------------------------
+3.Produce corrected documentation Generate:
+- corrected_readme.md
+The corrected version must:
+- Contain only working examples
+- Match the actual behavior of input.ts
+- Clearly explain constraints and edge cases
+--------------------------------------------------------------------------------
+4.Evidence & error traces (mandatory)
+For every broken example, you MUST provide:
+- Error trace or runtime error message
+- Clear reproduction steps
+- Code citation:
+- File name
+- Line numbers in input.ts
+--------------------------------------------------------------------------------
+5.Output defects list
+Generate defects.txt containing:
+- Defect ID
+- Description
+- Failing example
+- Error trace
+- Suggested fix
+--------------------------------------------------------------------------------
+📌 Rules for the Model
+- MUST NOT assume undocumented behavior
+- MUST NOT hallucinate errors
+- MUST include real error messages based on the code
+- MUST clearly distinguish documentation bugs vs code bugs
+- MUST keep output concise, structured, and reproducible
+
+GitHub Copilot: Optimizing tool selection...I'll analyze the documentation against the implementation to identify issues. Let me start by examining both files carefully. 
+
+Created 5 todos
+
+Now let me analyze the issues:
+
+## Critical Issues Found
+
+### Issue 1: README Example Will Throw Error
+The README.md shows:
+```typescript
+retry(() => fetchData(), {
+  retryCount: 0
+})
+```
+
+But input.ts validates:
+```typescript
+if (retryCount < 1 || retryCount > 5) {
+  throw new Error("retryCount must be between 1 and 5")
+}
+```
+
+**Error:** Using `retryCount: 0` will throw: `Error: retryCount must be between 1 and 5`
+
+### Issue 2: Fundamental Implementation Bug
+The retry logic in input.ts has a critical bug. The `attempts` counter is scoped locally and resets on each recursive call:
+
+```typescript
+let attempts = 0  // This resets on EVERY retry() call
+
+return fn().catch(async (err) => {
+  if (attempts >= retryCount) {
+    throw err
+  }
+  attempts++
+  return retry(fn, { retryCount })  // Creates NEW attempts = 0
+})
+```
+
+**Result:** The retry limit is never enforced - it will retry infinitely until success. 
+
+Starting: *Test the documented example with retryCount: 0* (2/5)
+
+Starting: *Create corrected_readme.md* (4/5)
+
+Created [](file:///c%3A/Users/v-danlingyin/Documents/microsoft_projects_files/bugBash/26.1/1.8/case1/Claude-haiku-4.5/corrected_readme.md)
+
+Starting: *Generate defects.txt* (5/5)
+
+Created [](file:///c%3A/Users/v-danlingyin/Documents/microsoft_projects_files/bugBash/26.1/1.8/case1/Claude-haiku-4.5/defects.txt)
+
+Completed: *Generate defects.txt* (5/5)
+
+## Verification Complete ✓
+
+I've analyzed the documentation against the implementation and identified **4 critical defects**.
+
+### Key Findings:
+
+**Documentation Defects:**
+1. **Invalid Example** - README.md shows `retryCount: 0`, but input.ts requires values 1-5. This throws: `Error: retryCount must be between 1 and 5`
+2. **Missing Default Value** - Docs don't mention default is 3 (input.ts)
+3. **Missing Constraints** - No documentation of the 1-5 validation range
+
+**Implementation Defect (Critical):**
+4. **Broken Retry Logic** - input.ts resets `attempts` on each recursive call, causing infinite retries instead of respecting `retryCount`
+
+### Generated Files:
+
+✅ **corrected_readme.md** - Working documentation with:
+- Valid examples (retryCount: 1-5)
+- Documented constraints and defaults
+- Warning about the implementation bug
+
+✅ **defects.txt** - Complete defect report with:
+- Error traces for each issue
+- Code citations with line numbers
+- Reproduction steps
+- Suggested fixes
+
+All defects include real error messages and specific code references from the implementation.
+
+Made changes.

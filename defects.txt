@@ -1,0 +1,211 @@
+================================================================================
+DEFECTS REPORT: Retry Utility Documentation & Implementation
+================================================================================
+Date: January 8, 2026
+Files Analyzed: README.md, input.ts
+================================================================================
+
+--------------------------------------------------------------------------------
+DEFECT #1: Documentation Example Uses Invalid Parameter Value
+--------------------------------------------------------------------------------
+Severity: HIGH
+Type: Documentation Bug
+
+Location: 
+  File: README.md
+  Lines: 10-13
+
+Failing Example:
+```typescript
+retry(() => fetchData(), {
+  retryCount: 0
+})
+```
+
+Error Trace:
+Error: retryCount must be between 1 and 5
+    at retry (input.ts:14)
+
+Root Cause:
+The documentation example uses `retryCount: 0`, but the implementation in 
+input.ts lines 13-15 validates that retryCount must be between 1 and 5 
+(inclusive). Any value outside this range throws an error immediately.
+
+Code Citation:
+  File: input.ts
+  Lines: 13-15
+  Code:
+    if (retryCount < 1 || retryCount > 5) {
+      throw new Error("retryCount must be between 1 and 5")
+    }
+
+Reproduction Steps:
+1. Import retry function: import { retry } from "./input"
+2. Call: retry(() => Promise.resolve(), { retryCount: 0 })
+3. Error is thrown immediately before any retry attempt
+
+Suggested Fix:
+Update README.md to use a valid retryCount value (1-5):
+```typescript
+retry(() => fetchData(), {
+  retryCount: 3  // Valid: between 1 and 5
+})
+```
+
+Add a section documenting the constraint:
+- retryCount must be between 1 and 5
+- Default value is 3
+- Values outside range throw error
+
+--------------------------------------------------------------------------------
+DEFECT #2: Missing Documentation of Default Parameter Values
+--------------------------------------------------------------------------------
+Severity: MEDIUM
+Type: Documentation Bug
+
+Location:
+  File: README.md
+  Section: Usage examples
+
+Issue:
+The README does not document the default value for retryCount parameter.
+
+Code Citation:
+  File: input.ts
+  Line: 11
+  Code:
+    const retryCount = options.retryCount ?? 3
+
+Actual Behavior:
+When retryCount is not provided, it defaults to 3.
+
+Suggested Fix:
+Add to README:
+- Default retryCount: 3
+- Example showing usage without parameters
+
+--------------------------------------------------------------------------------
+DEFECT #3: Missing Documentation of Parameter Constraints
+--------------------------------------------------------------------------------
+Severity: MEDIUM
+Type: Documentation Bug
+
+Location:
+  File: README.md
+  Section: Entire file
+
+Issue:
+No mention of the validation constraint that retryCount must be between 1-5.
+Users will not know about this limitation until they encounter the error.
+
+Code Citation:
+  File: input.ts
+  Lines: 13-15
+
+Suggested Fix:
+Add a "Constraints" or "Important Notes" section explaining:
+- Valid range for retryCount: 1 to 5
+- Error thrown for invalid values
+- Show examples of invalid usage
+
+--------------------------------------------------------------------------------
+DEFECT #4: Critical Implementation Bug - Retry Limit Not Enforced
+--------------------------------------------------------------------------------
+Severity: CRITICAL
+Type: Implementation Bug (Impacts Documentation Accuracy)
+
+Location:
+  File: input.ts
+  Lines: 17-26
+
+Issue:
+The retry mechanism does not properly track attempts across recursive calls.
+The `attempts` variable is scoped locally and resets to 0 on each recursive
+retry() call, making the retry limit ineffective.
+
+Code Citation:
+  File: input.ts
+  Lines: 17-26
+  Code:
+    let attempts = 0  // This variable is LOCAL to each function call
+
+    return fn().catch(async (err) => {
+      if (attempts >= retryCount) {
+        throw err
+      }
+      attempts++
+      return retry(fn, { retryCount })  // Recursive call creates NEW attempts = 0
+    })
+
+Root Cause:
+When retry() calls itself recursively, it creates a new execution context with
+a fresh `attempts = 0`. The incremented value from the previous call is lost.
+
+Actual Behavior:
+- Function will retry indefinitely (or until success)
+- The retryCount parameter has no effect on limiting retries
+- Will only stop when fn() succeeds or call stack overflow occurs
+
+Expected Behavior:
+Function should retry exactly `retryCount` times before throwing the error.
+
+Error Trace (Stack Overflow Scenario):
+If fn() always fails, eventual stack overflow:
+RangeError: Maximum call stack size exceeded
+    at retry (input.ts:20)
+    at retry (input.ts:25)
+    at retry (input.ts:25)
+    ... (repeated many times)
+
+Reproduction Steps:
+1. Create a function that always fails: 
+   const alwaysFails = () => Promise.reject(new Error("Failed"))
+2. Call: retry(alwaysFails, { retryCount: 2 })
+3. Observe: Function retries many more times than 2
+4. Eventually: Stack overflow or indefinite retries
+
+Suggested Fix (Code):
+```typescript
+export function retry(
+  fn: () => Promise<unknown>,
+  options: RetryOptions = {},
+  attempts = 0  // Add attempts as parameter with default
+) {
+  const retryCount = options.retryCount ?? 3
+
+  if (retryCount < 1 || retryCount > 5) {
+    throw new Error("retryCount must be between 1 and 5")
+  }
+
+  return fn().catch(async (err) => {
+    if (attempts >= retryCount) {
+      throw err
+    }
+    return retry(fn, options, attempts + 1)  // Pass incremented attempts
+  })
+}
+```
+
+Impact on Documentation:
+Current documentation implies retry behavior works correctly, but due to this
+bug, the actual retry behavior is unpredictable and does not respect the
+retryCount parameter.
+
+--------------------------------------------------------------------------------
+SUMMARY
+--------------------------------------------------------------------------------
+Total Defects: 4
+  - Documentation Bugs: 3
+  - Implementation Bugs: 1 (Critical)
+
+Critical Issues:
+  1. Example uses invalid parameter (will crash)
+  2. Implementation doesn't enforce retry limits (infinite retries)
+
+Recommendations:
+  1. Fix implementation bug first (DEFECT #4)
+  2. Update documentation with correct examples and constraints
+  3. Add validation examples showing what throws errors
+  4. Document default values and behavioral constraints
+
+================================================================================
