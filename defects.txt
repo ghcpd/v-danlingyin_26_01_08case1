@@ -1,0 +1,45 @@
+DEF-001
+Description: Documentation shows `retryCount: 0` which is invalid.
+Failing example (README.md, Installation section):
+```
+retry(() => fetchData(), {
+  retryCount: 0
+})
+```
+Error trace / observed behavior: Calling `retry` with `retryCount: 0` throws immediately with message:
+```
+Error: retryCount must be between 1 and 5
+```
+Code citation:
+- File: `input.ts`
+- Lines: 14-16
+- Code:
+  if (retryCount < 1 || retryCount > 5) {
+    throw new Error("retryCount must be between 1 and 5")
+  }
+Suggested fix: Update docs to use valid values (1–5) or omit `retryCount` to use the default (3). Updated README included `retry()` example without `retryCount`.
+
+---
+
+DEF-002
+Description: Implementation bug — retries never stop when `fn` always rejects because `attempts` is a local variable reset on each recursive invocation.
+Failing example (repro):
+```
+await retry(() => Promise.reject(new Error('fail')), { retryCount: 3 })
+```
+Observed behavior / error trace: No immediate error; the function will continue retrying indefinitely (no termination) — i.e., the original error is never propagated after the first failure. This causes a hung operation that will eventually exhaust resources if left running.
+Code citation:
+- File: `input.ts`
+- Lines: 18-25
+- Code:
+  let attempts = 0
+
+  return fn().catch(async (err) => {
+    if (attempts >= retryCount) {
+      throw err
+    }
+    attempts++
+    return retry(fn, { retryCount })
+  })
+Root cause: `attempts` is declared inside each top-level call to `retry` and is reset to `0` for each recursive call — therefore `attempts >= retryCount` is never reached.
+Suggested fix: Preserve `attempts` across retries (use a loop or pass attempt count through recursion). Example fix provided in corrected_readme.md.
