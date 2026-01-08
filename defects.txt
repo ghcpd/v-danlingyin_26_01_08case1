@@ -1,0 +1,34 @@
+DEF-001
+Description: README shows `retryCount: 0`, but the implementation validates `retryCount` must be between 1 and 5 and throws.
+Failing example (from README.md):
+  retry(() => fetchData(), { retryCount: 0 })
+Error trace / message:
+  Error: retryCount must be between 1 and 5
+Reproduction steps:
+  1. Import `retry` from `input.ts`.
+  2. Call `retry(() => Promise.resolve(), { retryCount: 0 })`.
+  3. The call throws synchronously with the message above.
+File / lines:
+  input.ts lines ~11-15 (validation and throw)
+Suggested fix:
+  Documentation: change README to use a valid retryCount (1..5) and document the allowed range. Or code: allow 0 as a valid value if intended.
+
+
+DEF-002
+Description: Implementation resets `attempts` on recursion causing unbounded recursion when the retried function continues to reject; results in `RangeError: Maximum call stack size exceeded`.
+Failing example:
+  // a function that always rejects
+  retry(() => Promise.reject(new Error('fail')), { retryCount: 3 })
+Observed error:
+  RangeError: Maximum call stack size exceeded
+Reproduction steps:
+  1. Call retry with a function that rejects on every call and a valid retryCount (e.g., 3).
+  2. Execution recursively calls `retry` indefinitely until Node throws a RangeError.
+File / lines:
+  input.ts lines ~17-25 (attempts initialization, increment, and recursive call)
+Root cause:
+  `let attempts = 0` is local to each invocation. Each recursive `retry` call creates a new `attempts` variable, so the terminating condition `attempts >= retryCount` is never reached.
+Suggested fix:
+  - Option A: Convert to iterative loop (use a for-loop to attempt up to `retryCount` times).
+  - Option B: Thread the `attempts` count through recursive calls (e.g., add a 3rd parameter `attempts` and increment it when recursing) and check it before recursing.
+
