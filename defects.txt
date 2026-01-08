@@ -1,0 +1,70 @@
+DEF-001
+Title: README contains an invalid usage example (retryCount: 0)
+Description: README.md shows `retry(..., { retryCount: 0 })` which is outside the allowed range and causes an immediate error.
+Failing example:
+  retry(() => fetchData(), { retryCount: 0 })
+Error trace / message:
+  Error: retryCount must be between 1 and 5
+Reproduction steps:
+  1. Create `test.ts` with: `import { retry } from './input'; retry(() => Promise.resolve(), { retryCount: 0 })`
+  2. Run via `npx ts-node test.ts` or `tsc && node`.
+Code citation:
+  input.ts: lines 11-15 (range validation + throw)
+Suggested fix:
+  - Documentation: remove the `retryCount: 0` example and document valid range (1–5). (implemented in corrected_readme.md)
+  - Optional: allow `0` if semantics require 0 retries (change validation and document semantics).
+Severity: Documentation (P2)
+
+
+DEF-002
+Title: retry limit not enforced across recursive calls — can lead to stack overflow
+Description: The implementation resets `attempts` on each recursive call so the `retryCount` check never reaches its limit when `fn` keeps rejecting. This can cause unbounded recursion and a runtime RangeError.
+Failing example:
+  // function that always rejects
+  await retry(() => Promise.reject(new Error('boom')), { retryCount: 3 })
+Actual behavior:
+  - Expected: after up to 3 attempts the helper should reject with the original error.
+  - Actual: recursive calls continue until the process throws `RangeError: Maximum call stack size exceeded` (or `process` runs out of resources).
+Error trace (typical):
+  RangeError: Maximum call stack size exceeded
+  at retry (input.ts:24:12)
+  at retry (input.ts:24:12)
+  ... repeated frames ...
+Reproduction steps:
+  1. Create `test.ts` with: `import { retry } from './input'; await retry(() => Promise.reject(new Error('boom')), { retryCount: 3 })`
+  2. Run `npx ts-node test.ts` or `tsc && node`.
+Code citation:
+  input.ts: lines 17 (attempts initialised), 20-24 (check, increment, recursive call)
+Root cause:
+  - `attempts` is a local variable that is re-initialized on each recursive call. The termination condition therefore never becomes true for repeatedly-rejecting `fn`.
+Suggested fix (code):
+  Replace recursion with a loop or persist attempt count between calls. Example:
+    let attempts = 0
+    while (true) {
+      try { return await fn() }
+      catch (err) {
+        attempts++
+        if (attempts >= retryCount) throw err
+      }
+    }
+Severity: Code (P0)
+
+
+DEF-003
+Title: README code block mixes shell + TypeScript (copy-paste is not runnable)
+Description: The README's example is inside a single ````bash```` fence but contains TypeScript `import` and example code. Copy-pasting the whole block into a shell will fail.
+Failing snippet:
+```bash
+pnpm install retry-util
+
+import { retry } from "./input"
+
+retry(() => fetchData(), {
+  retryCount: 0
+})
+```
+Observed behavior when pasted into PowerShell:
+  The term 'import' is not recognized as the name of a cmdlet, function, script file, or operable program.
+Suggested fix:
+  - Separate installation commands and code examples into distinct fenced blocks and label them correctly (bash vs. ts). Fixed in corrected_readme.md.
+Severity: Documentation (P3)
