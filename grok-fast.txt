@@ -1,0 +1,164 @@
+grok-fast   ：：
+User: prompt
+You are a senior software engineer and documentation verification specialist.
+Your task is to verify whether the provided tutorial documentation actually works as described when used with the provided TypeScript source code.
+You are given:
+- A README.md file containing usage examples
+- An input.ts file containing the implementation
+Your responsibilities:
+1.Verify tutorial examples
+- Follow the README.md step by step
+- Identify examples or commands that:
+- Do not run
+- Produce runtime errors
+- Behave differently from what is described
+For each failing example, provide:
+- Documentation location (file + section)
+- Example code snippet
+- Actual error or incorrect behavior
+- Root cause explanation
+--------------------------------------------------------------------------------
+2.Identify documentation mismatches
+- Compare README.md examples against actual implementation
+- Identify:
+- Wrong parameters
+- Wrong default values
+- Outdated usage patterns
+- Missing required setup steps
+--------------------------------------------------------------------------------
+3.Produce corrected documentation Generate:
+- corrected_readme.md
+The corrected version must:
+- Contain only working examples
+- Match the actual behavior of input.ts
+- Clearly explain constraints and edge cases
+--------------------------------------------------------------------------------
+4.Evidence & error traces (mandatory)
+For every broken example, you MUST provide:
+- Error trace or runtime error message
+- Clear reproduction steps
+- Code citation:
+- File name
+- Line numbers in input.ts
+--------------------------------------------------------------------------------
+5.Output defects list
+Generate defects.txt containing:
+- Defect ID
+- Description
+- Failing example
+- Error trace
+- Suggested fix
+--------------------------------------------------------------------------------
+📌 Rules for the Model
+- MUST NOT assume undocumented behavior
+- MUST NOT hallucinate errors
+- MUST include real error messages based on the code
+- MUST clearly distinguish documentation bugs vs code bugs
+- MUST keep output concise, structured, and reproducible
+
+GitHub Copilot: Ran terminal command: tsc --version
+
+Ran terminal command: node --version
+
+Created [](file:///c%3A/Users/v-danlingyin/Documents/microsoft_projects_files/bugBash/26.1/1.8/case1/grok-fast/test.ts)
+
+Ran terminal command: npx ts-node test.ts
+
+Using "Replace String in File"
+
+
+```
+
+```
+
+
+Ran terminal command: npx ts-node test.ts
+
+Using "Replace String in File"
+
+
+```
+
+```
+
+
+Ran terminal command: npx ts-node test.ts
+
+Using "Replace String in File"
+
+
+```
+
+```
+
+
+Ran terminal command: npx tsc input.ts --module commonjs --target es2020 --outDir .
+
+Ran terminal command: npm init -y
+
+Ran terminal command: npm install typescript
+
+Ran terminal command: npx tsc input.ts --module commonjs --target es2020 --outDir .
+
+Read [](file:///c%3A/Users/v-danlingyin/Documents/microsoft_projects_files/bugBash/26.1/1.8/case1/grok-fast)
+
+Using "Replace String in File"
+
+
+```
+
+```
+
+
+Ran terminal command: npx ts-node test.ts
+
+Created [](file:///c%3A/Users/v-danlingyin/Documents/microsoft_projects_files/bugBash/26.1/1.8/case1/grok-fast/corrected_readme.md)
+
+Created [](file:///c%3A/Users/v-danlingyin/Documents/microsoft_projects_files/bugBash/26.1/1.8/case1/grok-fast/defects.txt)
+
+## Documentation Verification Report
+
+### 1. Tutorial Examples Verification
+
+Following the README.md step by step:
+
+- **Installation**: The `pnpm install retry-util` command is provided, but since this is a local source file, installation is not applicable for testing. No issues here.
+
+- **Usage Example**: The example code does not run successfully due to multiple issues.
+
+  - **Does not run / Runtime errors**:
+    - Import path `"./input"` fails in ESM context.
+    - `fetchData()` is undefined, causing ReferenceError.
+    - Even with fixes, the code exhibits infinite retry behavior due to implementation bug.
+
+  - **Incorrect behavior**: Instead of retrying up to 3 times and failing, the function retries infinitely on failure.
+
+### 2. Documentation Mismatches
+
+- **Wrong import path**: `"./input"` does not work in TypeScript ESM; requires `"./input.js"` or module configuration.
+- **Undefined dependencies**: Example assumes `fetchData` is defined, but it's not.
+- **Behavioral mismatch**: Documentation claims limited retries, but code retries infinitely due to recursion bug.
+
+### 3. Corrected Documentation
+
+Generated corrected_readme.md with:
+- Fixed import path to `"./input.js"`.
+- Added definition for `fetchData` in the example.
+- Added note about the implementation bug affecting retry behavior.
+
+### 4. Evidence & Error Traces
+
+- **Import error**: `Error: Cannot find module './input'`
+- **Undefined function**: `ReferenceError: fetchData is not defined`
+- **Infinite loop**: Program hangs indefinitely when function fails (observed in testing).
+
+### 5. Defects List
+
+Generated defects.txt with 3 defects:
+- **DOC-1**: Import path issue (documentation bug).
+- **DOC-2**: Undefined function in example (documentation bug).
+- **CODE-1**: Infinite recursion bug (code bug).
+
+**Distinction**: DOC-1 and DOC-2 are documentation issues (incorrect examples). CODE-1 is a code implementation bug causing the retry logic to fail.
+
+Made changes.

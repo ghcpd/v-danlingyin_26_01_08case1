@@ -1,0 +1,17 @@
+Defect ID: DOC-1
+Description: Incorrect import path for ESM modules. The path "./input" does not resolve in TypeScript ESM without proper configuration or extension.
+Failing example: import { retry } from "./input"
+Error trace: Error: Cannot find module 'C:\Users\v-danlingyin\Documents\microsoft_projects_files\bugBash\26.1\1.8\case1\grok-fast\input' imported from C:\Users\v-danlingyin\Documents\microsoft_projects_files\bugBash\26.1\1.8\case1\grok-fast\test.ts
+Suggested fix: Change import to import { retry } from "./input.js"
+
+Defect ID: DOC-2
+Description: Example uses undefined function fetchData, causing runtime error.
+Failing example: const result = await retry(() => fetchData(), { retryCount: 3 })
+Error trace: ReferenceError: fetchData is not defined
+Suggested fix: Define fetchData function or replace with an inline async function.
+
+Defect ID: CODE-1
+Description: The retry function has a bug in its implementation, causing infinite recursion on failure instead of retrying a limited number of times.
+Failing example: await retry(() => { throw new Error("fail") }, { retryCount: 3 })
+Error trace: Program hangs indefinitely due to infinite loop/recursion.
+Suggested fix: Refactor the retry function to use a loop instead of recursive calls, tracking attempts properly.
