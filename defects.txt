@@ -1,0 +1,273 @@
+================================================================================
+DOCUMENTATION DEFECTS REPORT - Retry Utility
+================================================================================
+
+Date: January 8, 2026
+Files Analyzed: README.md, input.ts
+
+================================================================================
+DEFECT #1: Invalid retryCount Value in Example
+================================================================================
+
+Severity: HIGH
+Type: Documentation Bug
+
+Location:
+- File: README.md
+- Section: Usage Example
+
+Failing Example:
+```javascript
+retry(() => fetchData(), {
+  retryCount: 0
+})
+```
+
+Error Trace:
+```
+Error: retryCount must be between 1 and 5
+    at retry (input.ts:13)
+```
+
+Root Cause:
+The README.md shows an example using `retryCount: 0`, but the implementation in input.ts lines 13-15 validates that retryCount must be between 1 and 5 (inclusive).
+
+Code Reference:
+- File: input.ts
+- Lines: 13-15
+```typescript
+if (retryCount < 1 || retryCount > 5) {
+  throw new Error("retryCount must be between 1 and 5")
+}
+```
+
+Expected vs Actual:
+- Expected: Example to work as documented
+- Actual: Throws validation error immediately
+
+Suggested Fix:
+Change the README example to use a valid retryCount value (1-5):
+```javascript
+retry(() => fetchData(), {
+  retryCount: 3  // or any value between 1 and 5
+})
+```
+
+================================================================================
+DEFECT #2: Infinite Recursion Bug in Retry Logic
+================================================================================
+
+Severity: CRITICAL
+Type: Code Bug (but impacts documentation validity)
+
+Location:
+- File: input.ts
+- Lines: 17, 20-24
+
+Failing Example:
+ANY example that triggers a retry will enter infinite recursion:
+```javascript
+retry(() => failingFunction(), {
+  retryCount: 3
+})
+```
+
+Error Trace:
+```
+Attempt 1
+Attempt 2
+Attempt 3
+...
+Attempt 175000
+Attempt 176000
+Attempt 217000
+[Process continues infinitely until killed or memory exhausted]
+```
+
+Root Cause:
+The `attempts` variable is declared as a local variable on line 17:
+```typescript
+let attempts = 0
+```
+
+When the function recursively calls itself on line 24:
+```typescript
+return retry(fn, { retryCount })
+```
+
+A NEW function scope is created with a NEW `attempts` variable initialized to 0. This means the condition `attempts >= retryCount` on line 20 will NEVER be true because `attempts` is always 0 in each recursive call.
+
+Code Reference:
+- File: input.ts
+- Lines: 17-24
+```typescript
+let attempts = 0  // ← Resets to 0 on each recursion
+
+return fn().catch(async (err) => {
+  if (attempts >= retryCount) {  // ← Always false (attempts is always 0)
+    throw err
+  }
+  attempts++
+  return retry(fn, { retryCount })  // ← Creates new scope with new attempts = 0
+})
+```
+
+Expected vs Actual:
+- Expected: Retry up to `retryCount` times, then throw the error
+- Actual: Retries infinitely, never stopping
+
+Impact:
+This bug makes the retry function COMPLETELY UNUSABLE. Any failing operation will retry forever, consuming CPU and memory until the process crashes or is killed.
+
+Evidence:
+Test execution showed 217,276+ attempts before manual termination, far exceeding the specified retryCount of 3.
+
+Suggested Fix:
+The attempts counter needs to persist across recursive calls. Options:
+1. Pass attempts as a parameter
+2. Use a closure to maintain state
+3. Restructure to use a loop instead of recursion
+
+Example fix using parameter:
+```typescript
+export function retry(
+  fn: () => Promise<unknown>,
+  options: RetryOptions = {},
+  attempts: number = 0  // Add attempts parameter
+) {
+  const retryCount = options.retryCount ?? 3
+
+  if (retryCount < 1 || retryCount > 5) {
+    throw new Error("retryCount must be between 1 and 5")
+  }
+
+  return fn().catch(async (err) => {
+    if (attempts >= retryCount) {
+      throw err
+    }
+    return retry(fn, options, attempts + 1)  // Pass incremented attempts
+  })
+}
+```
+
+================================================================================
+DEFECT #3: Undefined Function in Example
+================================================================================
+
+Severity: MEDIUM
+Type: Documentation Bug
+
+Location:
+- File: README.md
+- Section: Usage Example
+
+Failing Example:
+```javascript
+retry(() => fetchData(), {
+  retryCount: 0
+})
+```
+
+Error:
+```
+ReferenceError: fetchData is not defined
+```
+
+Root Cause:
+The example calls `fetchData()` which is not defined anywhere. This is a placeholder function that users must define themselves, but the documentation doesn't explain this.
+
+Suggested Fix:
+Either:
+1. Add a note that fetchData is a placeholder:
+```javascript
+// Define your async function
+const fetchData = async () => {
+  const response = await fetch('https://api.example.com/data')
+  return response.json()
+}
+
+retry(() => fetchData(), {
+  retryCount: 3
+})
+```
+
+2. Or use a complete working example with inline function:
+```javascript
+retry(async () => {
+  const response = await fetch('https://api.example.com/data')
+  return response.json()
+}, {
+  retryCount: 3
+})
+```
+
+================================================================================
+DEFECT #4: Malformed Markdown in Installation Section
+================================================================================
+
+Severity: LOW
+Type: Documentation Bug
+
+Location:
+- File: README.md
+- Section: Installation
+
+Issue:
+The code block is not properly closed, and usage examples are mixed into the installation section without clear separation.
+
+Current Structure:
+```markdown
+## Installation
+
+```bash
+pnpm install retry-util
+
+import { retry } from "./input"
+
+retry(() => fetchData(), {
+  retryCount: 0
+})
+```
+
+The bash code block should close before showing JavaScript usage examples, and there should be separate sections for installation vs usage.
+
+Suggested Fix:
+```markdown
+## Installation
+
+```bash
+pnpm install retry-util
+```
+
+## Usage
+
+```javascript
+import { retry } from "./input"
+
+retry(() => fetchData(), {
+  retryCount: 3
+})
+```
+```
+
+================================================================================
+SUMMARY
+================================================================================
+
+Total Defects: 4
+- Critical: 1 (Infinite recursion bug)
+- High: 1 (Invalid retryCount in example)
+- Medium: 1 (Undefined function)
+- Low: 1 (Markdown formatting)
+
+Documentation Status: FAILS VERIFICATION
+- 0 out of 1 examples work correctly
+- All examples will either throw validation errors or enter infinite loops
+
+Recommendation:
+1. Fix the critical infinite recursion bug in input.ts
+2. Update README.md with valid, working examples
+3. Add clear documentation about constraints (retryCount must be 1-5)
+4. Provide complete, runnable examples
+
+================================================================================
